@@ -1,73 +1,81 @@
-# React + TypeScript + Vite
+# Portal de Semilleros de Investigación - UdeA
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend del portal de semilleros de la Universidad de Antioquia, desarrollado como parte del proyecto SIGSI (Sistema de Gestión de Semilleros de Investigación) de la Vicerrectoría de Investigación.
 
-Currently, two official plugins are available:
+## ¿De qué trata esto?
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Este proyecto es la interfaz web para que estudiantes puedan consultar los semilleros de investigación activos de la UdeA, ver sus detalles y solicitar inscripción.
 
-## React Compiler
+## Tecnologías usadas
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **React 19** con **TypeScript**
+- **Vite** como bundler
+- **Bootstrap 5** para los estilos y componentes (modales, tooltips, etc.)
+- **Bootstrap Icons** para los íconos
 
-## Expanding the ESLint configuration
+## Estructura del proyecto
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+src/
+├── api/
+│   └── semillerosApi.ts      # acá van las llamadas al backend (por ahora mock)
+├── data/
+│   └── mockData.ts           # datos de prueba de semilleros
+├── types/
+│   └── index.ts              # tipos de TypeScript
+├── styles/
+│   └── udea.css              # estilos propios con la paleta de la UdeA
+├── components/
+│   ├── Header.tsx
+│   ├── FiltersSection.tsx
+│   ├── SemilleroCard.tsx
+│   ├── SemilleroList.tsx
+│   ├── DetailsModal.tsx      # modal con info completa del semillero
+│   ├── RegistrationModal.tsx # formulario de inscripción en 3 pasos
+│   └── Footer.tsx
+├── pages/
+│   └── HomePage.tsx          # página principal, acá vive todo el estado
+└── App.tsx
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Cómo correr el proyecto
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Primero instalar dependencias (si no lo has hecho):
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
+
+Levantar el servidor de desarrollo:
+
+```bash
+npm run dev
+```
+
+Abre el navegador en `http://localhost:5173`
+
+Para hacer el build de producción:
+
+```bash
+npm run build
+```
+
+## Funcionalidades actuales
+
+- Listado de semilleros con tarjetas
+- Filtros por Unidad Académica, Área OCDE y búsqueda por texto
+- Modal de detalles con toda la información del semillero
+- Formulario de inscripción en 3 pasos con validación
+- Estados de carga y error
+
+## Pendiente / Próximos pasos
+
+- [ ] Conectar con el backend real (el archivo `src/api/semillerosApi.ts` ya está listo para eso, solo hay que cambiar los mocks por llamadas `fetch`)
+- [ ] Autenticación con cuenta institucional
+- [ ] Página de login (`login.html` referenciada en el header)
+- [ ] Formulario de creación de semillero (`registrosemillero3.html`)
+- [ ] Paginación en la lista de semilleros
+
+## Notas
+
+El archivo `src/api/semillerosApi.ts` simula delays de red para que se pueda ver el spinner de carga. Cuando haya backend real, cada función async se reemplaza por un `fetch` a la API correspondiente sin tener que tocar los componentes.
