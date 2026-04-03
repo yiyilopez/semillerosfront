@@ -40,13 +40,10 @@ src/
 
 ## Cómo correr el proyecto
 
-Primero instalar dependencias (si no lo has hecho):
 
 ```bash
 npm install
 ```
-
-Levantar el servidor de desarrollo:
 
 ```bash
 npm run dev
@@ -71,6 +68,3 @@ npm run build
 - [ ] Formulario de creación de semillero (`registrosemillero3.html`)
 - [ ] Paginación en la lista de semilleros
 
-## Notas
-
-El archivo `src/api/semillerosApi.ts` simula delays de red para que se pueda ver el spinner de carga. Cuando haya backend real, cada función async se reemplaza por un `fetch` a la API correspondiente sin tener que tocar los componentes.
