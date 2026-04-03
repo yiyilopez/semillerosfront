@@ -34,7 +34,7 @@ src/
 │   ├── RegistrationModal.tsx # formulario de inscripción en 3 pasos
 │   └── Footer.tsx
 ├── pages/
-│   └── HomePage.tsx          # página principal, acá vive todo el estado
+│   └── HomePage.tsx          # página principal
 └── App.tsx
 ```
 
@@ -68,11 +68,6 @@ npm run build
 - Formulario de inscripción en 3 pasos con validación
 - Estados de carga y error
 
-## Pendiente / Próximos pasos
-
-- [ ] Conectar con el backend real (el archivo `src/api/semillerosApi.ts` ya está listo para eso, solo hay que cambiar los mocks por llamadas `fetch`)
-- [ ] Autenticación con cuenta institucional
-- [ ] Página de login (`login.html` referenciada en el header)
 - [ ] Formulario de creación de semillero (`registrosemillero3.html`)
 - [ ] Paginación en la lista de semilleros
 
