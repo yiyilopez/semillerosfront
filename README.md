@@ -4,7 +4,7 @@ Frontend del portal de semilleros de la Universidad de Antioquia, desarrollado c
 
 ## ¿De qué trata esto?
 
-Este proyecto es la interfaz web para que estudiantes puedan consultar los semilleros de investigación activos de la UdeA, ver sus detalles y solicitar inscripción.
+Interfaz web para que estudiantes puedan consultar los semilleros de investigación activos de la UdeA, ver sus detalles y solicitar inscripción. Se conecta al backend [semilleros-udea](../semilleros-udea-master) vía REST.
 
 ## Tecnologías usadas
 
@@ -18,53 +18,67 @@ Este proyecto es la interfaz web para que estudiantes puedan consultar los semil
 ```
 src/
 ├── api/
-│   └── semillerosApi.ts      # acá van las llamadas al backend (por ahora mock)
-├── data/
-│   └── mockData.ts           # datos de prueba de semilleros
+│   └── semillerosApi.ts      # llamadas al backend (fetch sobre BASE_URL)
 ├── types/
-│   └── index.ts              # tipos de TypeScript
+│   └── index.ts              # tipos que mapean los DTOs del backend
 ├── styles/
 │   └── udea.css              # estilos propios con la paleta de la UdeA
 ├── components/
 │   ├── Header.tsx
-│   ├── FiltersSection.tsx
+│   ├── FiltersSection.tsx    # dropdowns cargados desde /api/v1/filtros/*
 │   ├── SemilleroCard.tsx
 │   ├── SemilleroList.tsx
-│   ├── DetailsModal.tsx      # modal con info completa del semillero
+│   ├── DetailsModal.tsx      # fetcha /api/v1/semilleros/{id} al abrirse
 │   ├── RegistrationModal.tsx # formulario de inscripción en 3 pasos
 │   └── Footer.tsx
 ├── pages/
-│   └── HomePage.tsx          # página principal
+│   └── HomePage.tsx          # página principal con paginación
 └── App.tsx
 ```
 
+## Variables de entorno
+
+Crea un archivo `.env` en la raíz del proyecto (ya incluido):
+
+```env
+VITE_API_BASE_URL=http://localhost:8080
+```
+
+Cambia la URL si el backend corre en otro host o puerto.
+
 ## Cómo correr el proyecto
 
+> El backend debe estar corriendo antes de iniciar el frontend.
 
 ```bash
 npm install
-```
-
-```bash
 npm run dev
 ```
 
 Abre el navegador en `http://localhost:5173`
 
-Para hacer el build de producción:
+Para el build de producción:
 
 ```bash
 npm run build
 ```
 
-## Funcionalidades actuales
+## Endpoints del backend consumidos
 
-- Listado de semilleros con tarjetas
-- Filtros por Unidad Académica, Área OCDE y búsqueda por texto
-- Modal de detalles con toda la información del semillero
-- Formulario de inscripción en 3 pasos con validación
-- Estados de carga y error
+| Método | Endpoint | Uso |
+|--------|----------|-----|
+| `GET` | `/api/v1/semilleros` | Listado paginado (params: `pagina`, `tamano`, `idUnidad`, `idCampus`, `idArea`, `q`) |
+| `GET` | `/api/v1/semilleros/{id}` | Detalle de un semillero |
+| `POST` | `/api/v1/inscripciones` | Enviar solicitud de inscripción |
+| `GET` | `/api/v1/filtros/unidades-academicas` | Opciones del dropdown Unidad Académica |
+| `GET` | `/api/v1/filtros/campus` | Opciones del dropdown Campus |
+| `GET` | `/api/v1/filtros/areas-ocde` | Opciones del dropdown Área OCDE |
 
-- [ ] Formulario de creación de semillero (`registrosemillero3.html`)
-- [ ] Paginación en la lista de semilleros
+## Funcionalidades
 
+- Listado paginado de semilleros con tarjetas
+- Filtros por Unidad Académica, Área OCDE, Campus y búsqueda por texto (cargados desde el backend)
+- Modal de detalles con toda la información del semillero (carga bajo demanda)
+- Formulario de inscripción en 3 pasos con validación y manejo de errores del backend
+- Paginación de resultados
+- Estados de carga y error en todas las operaciones
