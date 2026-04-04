@@ -1,11 +1,11 @@
-import type { Semillero } from '../types';
+import type { SemilleroResumen } from '../types';
 import SemilleroCard from './SemilleroCard';
 
 interface SemilleroListProps {
-  semilleros: Semillero[];
+  semilleros: SemilleroResumen[];
   loading: boolean;
-  onInscribirse: (semillero: Semillero) => void;
-  onVerDetalles: (semillero: Semillero) => void;
+  onInscribirse: (id: number, nombre: string) => void;
+  onVerDetalles: (id: number) => void;
 }
 
 export default function SemilleroList({

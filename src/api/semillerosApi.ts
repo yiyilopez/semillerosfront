@@ -1,51 +1,64 @@
-import type { Semillero, FilterValues, RegistrationFormData } from '../types';
-import { semillerosData } from '../data/mockData';
+import type {
+  FiltroItem,
+  FilterValues,
+  InscripcionFormData,
+  PageResponse,
+  SemilleroDetalle,
+  SemilleroResumen,
+} from '../types';
 
-// Simulates network delay
-const delay = (ms = 400) => new Promise((resolve) => setTimeout(resolve, ms));
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
 
-export async function getSemilleros(): Promise<Semillero[]> {
-  await delay();
-  return semillerosData;
+// El backend envuelve todas las respuestas en ApiResponse<T> { exitoso, mensaje, datos, ... }
+async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, options);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.mensaje ?? `Error ${res.status}`);
+  }
+  const json = await res.json();
+  return json.datos ?? json;
 }
 
-export async function filterSemilleros(filters: FilterValues): Promise<Semillero[]> {
-  await delay(200);
-  const { unidad, area, search } = filters;
-
-  return semillerosData.filter((s) => {
-    if (unidad && s.unidadAcademica !== unidad) return false;
-    if (area && s.areaOCDE !== area) return false;
-    if (search) {
-      const haystack = [s.nombre, s.objetivo, s.mision, s.departamento, s.facultad, s.relacionGrupo]
-        .join(' ')
-        .toLowerCase();
-      if (!haystack.includes(search.toLowerCase())) return false;
-    }
-    return true;
+export async function getSemilleros(
+  filters: FilterValues,
+  pagina = 0,
+  tamano = 15
+): Promise<PageResponse<SemilleroResumen>> {
+  const params = new URLSearchParams({
+    pagina: String(pagina),
+    tamano: String(tamano),
   });
+  if (filters.idUnidad) params.set('idUnidad', filters.idUnidad);
+  if (filters.idCampus) params.set('idCampus', filters.idCampus);
+  if (filters.idArea) params.set('idArea', filters.idArea);
+  if (filters.q) params.set('q', filters.q);
+  return apiFetch<PageResponse<SemilleroResumen>>(`/api/v1/semilleros?${params}`);
 }
 
-export async function submitRegistration(
-  semillero: Semillero,
-  formData: RegistrationFormData
+export async function getSemilleroById(id: number): Promise<SemilleroDetalle> {
+  return apiFetch<SemilleroDetalle>(`/api/v1/semilleros/${id}`);
+}
+
+export async function submitInscripcion(
+  idSemillero: number,
+  formData: InscripcionFormData
 ): Promise<void> {
-  await delay(600);
-  // When a real backend exists, replace the body below with a fetch/axios call.
-  console.log('=== SOLICITUD ENVIADA AL COORDINADOR DEL SEMILLERO ===');
-  console.log('Destinatario:', semillero.coordinadorEmail);
-  console.log('Asunto: Nueva solicitud de inscripción -', semillero.nombre);
-  console.log('Datos del estudiante:', {
-    nombre: formData.nombreCompleto,
-    cedula: formData.cedula,
-    correo: formData.correo,
-    telefono: formData.telefono,
-    facultad: formData.facultad,
-    programa: formData.programa,
-    institucion: formData.institucion,
-    semestre: formData.semestre,
-    motivacion: formData.motivacion,
-    experiencia: formData.experiencia || 'No especificada',
+  await apiFetch('/api/v1/inscripciones', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idSemillero, ...formData }),
   });
-  console.log('======================================');
+}
+
+export async function getUnidades(): Promise<FiltroItem[]> {
+  return apiFetch<FiltroItem[]>('/api/v1/filtros/unidades-academicas');
+}
+
+export async function getCampus(): Promise<FiltroItem[]> {
+  return apiFetch<FiltroItem[]>('/api/v1/filtros/campus');
+}
+
+export async function getAreasOcde(): Promise<FiltroItem[]> {
+  return apiFetch<FiltroItem[]>('/api/v1/filtros/areas-ocde');
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Semillero, FilterValues } from '../types';
-import { getSemilleros, filterSemilleros } from '../api/semillerosApi';
+import type { FilterValues, SemilleroResumen } from '../types';
+import { getSemilleros } from '../api/semillerosApi';
 import Header from '../components/Header';
 import FiltersSection from '../components/FiltersSection';
 import SemilleroList from '../components/SemilleroList';
@@ -8,49 +8,66 @@ import DetailsModal from '../components/DetailsModal';
 import RegistrationModal from '../components/RegistrationModal';
 import Footer from '../components/Footer';
 
+const EMPTY_FILTERS: FilterValues = { idUnidad: '', idArea: '', idCampus: '', q: '' };
+
 export default function HomePage() {
-  const [semilleros, setSemilleros] = useState<Semillero[]>([]);
+  const [semilleros, setSemilleros] = useState<SemilleroResumen[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [detailsSemillero, setDetailsSemillero] = useState<Semillero | null>(null);
+  const [paginaActual, setPaginaActual] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(0);
+  const [totalElementos, setTotalElementos] = useState(0);
+  const [currentFilters, setCurrentFilters] = useState<FilterValues>(EMPTY_FILTERS);
+
+  const [detailsId, setDetailsId] = useState<number | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
-  const [registrationSemillero, setRegistrationSemillero] = useState<Semillero | null>(null);
+  const [registrationId, setRegistrationId] = useState<number | null>(null);
+  const [registrationNombre, setRegistrationNombre] = useState('');
   const [showRegistration, setShowRegistration] = useState(false);
 
   const filtersSectionRef = useRef<HTMLDivElement>(null);
 
-  // Initial load
-  useEffect(() => {
-    getSemilleros()
-      .then(setSemilleros)
-      .catch(() => setError('No se pudo cargar la lista de semilleros.'))
-      .finally(() => setLoading(false));
-  }, []);
-
-  // Filter handler
-  async function handleFilter(filters: FilterValues) {
+  async function cargarSemilleros(filters: FilterValues, pagina: number) {
     setLoading(true);
     setError(null);
     try {
-      const results = await filterSemilleros(filters);
-      setSemilleros(results);
+      const page = await getSemilleros(filters, pagina);
+      setSemilleros(page.contenido);
+      setPaginaActual(page.paginaActual);
+      setTotalPaginas(page.totalPaginas);
+      setTotalElementos(page.totalElementos);
     } catch {
-      setError('Error al aplicar los filtros.');
+      setError('No se pudo cargar la lista de semilleros.');
     } finally {
       setLoading(false);
     }
   }
 
-  // Modal handlers
-  function handleVerDetalles(semillero: Semillero) {
-    setDetailsSemillero(semillero);
+  // Carga inicial
+  useEffect(() => {
+    cargarSemilleros(EMPTY_FILTERS, 0);
+  }, []);
+
+  function handleFilter(filters: FilterValues) {
+    setCurrentFilters(filters);
+    cargarSemilleros(filters, 0);
+  }
+
+  function handlePagina(pagina: number) {
+    cargarSemilleros(currentFilters, pagina);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function handleVerDetalles(id: number) {
+    setDetailsId(id);
     setShowDetails(true);
   }
 
-  function handleInscribirse(semillero: Semillero) {
-    setRegistrationSemillero(semillero);
+  function handleInscribirse(id: number, nombre: string) {
+    setRegistrationId(id);
+    setRegistrationNombre(nombre);
     setShowRegistration(true);
   }
 
@@ -76,19 +93,23 @@ export default function HomePage() {
               <div className="row">
                 <div className="col-md-4 col-6">
                   <div className="stats-card">
-                    <div className="stat-number">318</div>
+                    <div className="stat-number">{totalElementos || '—'}</div>
                     <div className="stat-label">Semilleros Activos</div>
                   </div>
                 </div>
                 <div className="col-md-4 col-6">
                   <div className="stats-card">
-                    <div className="stat-number">5350</div>
+                    <div className="stat-number">
+                      {semilleros.reduce((acc, s) => acc + s.totalSemilleristas, 0) || '—'}
+                    </div>
                     <div className="stat-label">Semilleristas</div>
                   </div>
                 </div>
                 <div className="col-md-4 col-6">
                   <div className="stats-card">
-                    <div className="stat-number">100</div>
+                    <div className="stat-number">
+                      {semilleros.reduce((acc, s) => acc + s.totalActividadesCientificas, 0) || '—'}
+                    </div>
                     <div className="stat-label">Actividades científicas</div>
                   </div>
                 </div>
@@ -121,19 +142,47 @@ export default function HomePage() {
             onVerDetalles={handleVerDetalles}
           />
         </div>
+
+        {/* Pagination */}
+        {!loading && totalPaginas > 1 && (
+          <div className="d-flex justify-content-center mt-4">
+            <nav>
+              <ul className="pagination">
+                <li className={`page-item${paginaActual === 0 ? ' disabled' : ''}`}>
+                  <button className="page-link" onClick={() => handlePagina(paginaActual - 1)}>
+                    <i className="bi bi-chevron-left"></i>
+                  </button>
+                </li>
+                {Array.from({ length: totalPaginas }, (_, i) => (
+                  <li key={i} className={`page-item${i === paginaActual ? ' active' : ''}`}>
+                    <button className="page-link" onClick={() => handlePagina(i)}>
+                      {i + 1}
+                    </button>
+                  </li>
+                ))}
+                <li className={`page-item${paginaActual === totalPaginas - 1 ? ' disabled' : ''}`}>
+                  <button className="page-link" onClick={() => handlePagina(paginaActual + 1)}>
+                    <i className="bi bi-chevron-right"></i>
+                  </button>
+                </li>
+              </ul>
+            </nav>
+          </div>
+        )}
       </main>
 
       <Footer />
 
       <DetailsModal
-        semillero={detailsSemillero}
+        semilleroId={detailsId}
         isOpen={showDetails}
         onClose={() => setShowDetails(false)}
         onInscribirse={handleInscribirse}
       />
 
       <RegistrationModal
-        semillero={registrationSemillero}
+        semilleroId={registrationId}
+        semilleroNombre={registrationNombre}
         isOpen={showRegistration}
         onClose={() => setShowRegistration(false)}
       />

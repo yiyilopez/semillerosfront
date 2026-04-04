@@ -1,22 +1,26 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal } from 'bootstrap';
-import type { Semillero } from '../types';
+import type { SemilleroDetalle } from '../types';
+import { getSemilleroById } from '../api/semillerosApi';
 
 interface DetailsModalProps {
-  semillero: Semillero | null;
+  semilleroId: number | null;
   isOpen: boolean;
   onClose: () => void;
-  onInscribirse: (semillero: Semillero) => void;
+  onInscribirse: (id: number, nombre: string) => void;
 }
 
 export default function DetailsModal({
-  semillero,
+  semilleroId,
   isOpen,
   onClose,
   onInscribirse,
 }: DetailsModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const instanceRef = useRef<Modal | null>(null);
+  const [detalle, setDetalle] = useState<SemilleroDetalle | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!modalRef.current) return;
@@ -33,7 +37,17 @@ export default function DetailsModal({
     }
   }, [isOpen]);
 
-  if (!semillero) return null;
+  // Cargar detalle cuando se abre el modal
+  useEffect(() => {
+    if (!isOpen || semilleroId == null) return;
+    setLoading(true);
+    setError(null);
+    setDetalle(null);
+    getSemilleroById(semilleroId)
+      .then(setDetalle)
+      .catch(() => setError('No se pudo cargar el detalle del semillero.'))
+      .finally(() => setLoading(false));
+  }, [isOpen, semilleroId]);
 
   return (
     <div className="modal fade" ref={modalRef} tabIndex={-1}>
@@ -42,97 +56,134 @@ export default function DetailsModal({
           <div className="modal-header">
             <h5 className="modal-title">
               <i className="bi bi-info-circle me-2"></i>
-              {semillero.nombre}
+              {detalle?.nombre ?? 'Detalle del Semillero'}
             </h5>
             <button type="button" className="btn-close" data-bs-dismiss="modal"></button>
           </div>
 
           <div className="modal-body">
-            <div className="row">
-              <div className="col-md-6">
-                <div className="info-item">
-                  <span className="info-label">Facultad:</span>
-                  <span className="info-value">{semillero.facultad}</span>
+            {loading && (
+              <div className="text-center py-5">
+                <div
+                  className="spinner-border"
+                  style={{ color: 'var(--udea-verde-principal)' }}
+                  role="status"
+                >
+                  <span className="visually-hidden">Cargando...</span>
                 </div>
-                <div className="info-item">
-                  <span className="info-label">Departamento:</span>
-                  <span className="info-value">{semillero.departamento}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Campus:</span>
-                  <span className="info-value">{semillero.sedeSeccional}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Año creación:</span>
-                  <span className="info-value">{semillero.añoCreacion}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Área OCDE:</span>
-                  <span className="info-value">{semillero.areaOCDE}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Sub-área OCDE:</span>
-                  <span className="info-value">{semillero.subareaOCDE}</span>
-                </div>
+                <p className="mt-3">Cargando información...</p>
               </div>
+            )}
 
-              <div className="col-md-6">
-                <div className="info-item">
-                  <span className="info-label">Vinculado RedSIN:</span>
-                  <span className="info-value">{semillero.vinculadoRedSIN}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Código grupo:</span>
-                  <span className="info-value">{semillero.codigoGrupo}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Grupo investigación:</span>
-                  <span className="info-value">{semillero.relacionGrupo}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Centro investigación:</span>
-                  <span className="info-value">{semillero.centroInvestigacion}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">ODS principal:</span>
-                  <span className="info-value">{semillero.odsPrincipal}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Coordinador semillero:</span>
-                  <span className="info-value">{semillero.coordinadorEmail}</span>
-                </div>
+            {error && (
+              <div className="alert alert-danger">
+                <i className="bi bi-exclamation-triangle me-2"></i>
+                {error}
               </div>
-            </div>
+            )}
 
-            <div className="mt-4">
-              <h6>Misión</h6>
-              <p className="text-muted">{semillero.mision}</p>
+            {detalle && (
+              <>
+                <div className="row">
+                  <div className="col-md-6">
+                    <div className="info-item">
+                      <span className="info-label">Código:</span>
+                      <span className="info-value">{detalle.codigo}</span>
+                    </div>
+                    <div className="info-item">
+                      <span className="info-label">Facultad:</span>
+                      <span className="info-value">{detalle.facultad}</span>
+                    </div>
+                    <div className="info-item">
+                      <span className="info-label">Campus:</span>
+                      <span className="info-value">{detalle.campus}</span>
+                    </div>
+                    <div className="info-item">
+                      <span className="info-label">Año creación:</span>
+                      <span className="info-value">{detalle.anioCreacion}</span>
+                    </div>
+                    <div className="info-item">
+                      <span className="info-label">Área OCDE:</span>
+                      <span className="info-value">{detalle.areaOcde}</span>
+                    </div>
+                  </div>
 
-              <h6 className="mt-3">Visión</h6>
-              <p className="text-muted">{semillero.vision}</p>
+                  <div className="col-md-6">
+                    <div className="info-item">
+                      <span className="info-label">Grupo investigación:</span>
+                      <span className="info-value">{detalle.grupoInvestigacion}</span>
+                    </div>
+                    <div className="info-item">
+                      <span className="info-label">Correo semillero:</span>
+                      <span className="info-value">{detalle.correoSemillero}</span>
+                    </div>
+                    <div className="info-item">
+                      <span className="info-label">Teléfono:</span>
+                      <span className="info-value">{detalle.telefono}</span>
+                    </div>
+                    <div className="info-item">
+                      <span className="info-label">Semilleristas:</span>
+                      <span className="info-value">{detalle.totalSemilleristas}</span>
+                    </div>
+                    <div className="info-item">
+                      <span className="info-label">Estado:</span>
+                      <span className="info-value">{detalle.estado}</span>
+                    </div>
+                  </div>
+                </div>
 
-              <h6 className="mt-3">Objetivo principal</h6>
-              <p className="text-muted">{semillero.objetivo}</p>
-
-              <h6 className="mt-3">Líneas de investigación</h6>
-              <p className="text-muted">{semillero.lineasInvestigacion}</p>
-            </div>
+                <div className="mt-4">
+                  {detalle.mision && (
+                    <>
+                      <h6>Misión</h6>
+                      <p className="text-muted">{detalle.mision}</p>
+                    </>
+                  )}
+                  {detalle.vision && (
+                    <>
+                      <h6 className="mt-3">Visión</h6>
+                      <p className="text-muted">{detalle.vision}</p>
+                    </>
+                  )}
+                  {detalle.objetivo && (
+                    <>
+                      <h6 className="mt-3">Objetivo principal</h6>
+                      <p className="text-muted">{detalle.objetivo}</p>
+                    </>
+                  )}
+                  {detalle.lineasInvestigacion && (
+                    <>
+                      <h6 className="mt-3">Líneas de investigación</h6>
+                      <p className="text-muted">{detalle.lineasInvestigacion}</p>
+                    </>
+                  )}
+                  {detalle.palabrasClave && (
+                    <>
+                      <h6 className="mt-3">Palabras clave</h6>
+                      <p className="text-muted">{detalle.palabrasClave}</p>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">
               Cerrar
             </button>
-            <button
-              type="button"
-              className="btn btn-udea"
-              onClick={() => {
-                onClose();
-                onInscribirse(semillero);
-              }}
-            >
-              <i className="bi bi-pencil-square me-2"></i>Inscribirse
-            </button>
+            {detalle && (
+              <button
+                type="button"
+                className="btn btn-udea"
+                onClick={() => {
+                  onClose();
+                  onInscribirse(detalle.id, detalle.nombre);
+                }}
+              >
+                <i className="bi bi-pencil-square me-2"></i>Inscribirse
+              </button>
+            )}
           </div>
         </div>
       </div>

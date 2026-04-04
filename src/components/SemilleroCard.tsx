@@ -1,9 +1,9 @@
-import type { Semillero } from '../types';
+import type { SemilleroResumen } from '../types';
 
 interface SemilleroCardProps {
-  semillero: Semillero;
-  onInscribirse: (semillero: Semillero) => void;
-  onVerDetalles: (semillero: Semillero) => void;
+  semillero: SemilleroResumen;
+  onInscribirse: (id: number, nombre: string) => void;
+  onVerDetalles: (id: number) => void;
 }
 
 export default function SemilleroCard({
@@ -16,14 +16,18 @@ export default function SemilleroCard({
       <div className="semillero-header">
         <h3 className="semillero-title">{semillero.nombre}</h3>
         <div>
-          <span className="semillero-badge badge-redsin">
-            <i className="bi bi-link-45deg me-1"></i>
-            {semillero.vinculadoRedSIN === 'Sí' ? 'RedSIN' : 'No RedSIN'}
-          </span>
-          <span className="semillero-badge badge-area">
-            <i className="bi bi-tags me-1"></i>
-            {semillero.areaOCDE}
-          </span>
+          {semillero.siglas && (
+            <span className="semillero-badge badge-redsin">
+              <i className="bi bi-tag me-1"></i>
+              {semillero.siglas}
+            </span>
+          )}
+          {semillero.estado && (
+            <span className="semillero-badge badge-area">
+              <i className="bi bi-circle-fill me-1" style={{ fontSize: '0.5rem' }}></i>
+              {semillero.estado}
+            </span>
+          )}
         </div>
       </div>
 
@@ -38,28 +42,31 @@ export default function SemilleroCard({
           <span className="info-label">
             <i className="bi bi-geo-alt info-icon"></i>Campus:
           </span>
-          <span className="info-value">{semillero.sedeSeccional}</span>
+          <span className="info-value">{semillero.campus}</span>
         </div>
         <div className="info-item">
           <span className="info-label">
             <i className="bi bi-calendar-check info-icon"></i>Año creación:
           </span>
-          <span className="info-value">{semillero.añoCreacion}</span>
+          <span className="info-value">{semillero.anioCreacion}</span>
         </div>
         <div className="info-item">
           <span className="info-label">
             <i className="bi bi-people info-icon"></i>Grupo investigación:
           </span>
-          <span className="info-value">{semillero.relacionGrupo}</span>
+          <span className="info-value">{semillero.grupoInvestigacion}</span>
         </div>
 
         <div className="d-grid mt-4">
-          <button className="btn btn-udea" onClick={() => onInscribirse(semillero)}>
+          <button
+            className="btn btn-udea"
+            onClick={() => onInscribirse(semillero.id, semillero.nombre)}
+          >
             <i className="bi bi-pencil-square me-2"></i>Inscribirse
           </button>
           <button
             className="btn btn-outline-secondary mt-2"
-            onClick={() => onVerDetalles(semillero)}
+            onClick={() => onVerDetalles(semillero.id)}
           >
             <i className="bi bi-info-circle me-2"></i>Ver detalles
           </button>

@@ -1,24 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from 'bootstrap';
-import type { Semillero, RegistrationFormData, RegistrationFormErrors } from '../types';
-import { submitRegistration } from '../api/semillerosApi';
+import type { InscripcionFormData, InscripcionFormErrors } from '../types';
+import { submitInscripcion } from '../api/semillerosApi';
 
-const EMPTY_FORM: RegistrationFormData = {
-  nombreCompleto: '',
+const EMPTY_FORM: InscripcionFormData = {
+  nombres: '',
+  apellidos: '',
   cedula: '',
   correo: '',
   telefono: '',
-  facultad: '',
   programa: '',
-  institucion: '',
   semestre: '',
   motivacion: '',
-  experiencia: '',
-  aceptoTerminos: false,
+  aceptaTerminos: false,
 };
 
 interface RegistrationModalProps {
-  semillero: Semillero | null;
+  semilleroId: number | null;
+  semilleroNombre: string;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -52,7 +51,8 @@ function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function RegistrationModal({
-  semillero,
+  semilleroId,
+  semilleroNombre,
   isOpen,
   onClose,
 }: RegistrationModalProps) {
@@ -60,9 +60,10 @@ export default function RegistrationModal({
   const instanceRef = useRef<Modal | null>(null);
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [form, setForm] = useState<RegistrationFormData>(EMPTY_FORM);
-  const [errors, setErrors] = useState<RegistrationFormErrors>({});
+  const [form, setForm] = useState<InscripcionFormData>(EMPTY_FORM);
+  const [errors, setErrors] = useState<InscripcionFormErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Bootstrap Modal setup
   useEffect(() => {
@@ -72,6 +73,7 @@ export default function RegistrationModal({
       setStep(1);
       setForm(EMPTY_FORM);
       setErrors({});
+      setSubmitError(null);
       onClose();
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -82,6 +84,7 @@ export default function RegistrationModal({
       setStep(1);
       setForm(EMPTY_FORM);
       setErrors({});
+      setSubmitError(null);
       instanceRef.current.show();
     } else {
       instanceRef.current.hide();
@@ -89,33 +92,33 @@ export default function RegistrationModal({
   }, [isOpen]);
 
   // ── Field helpers ───────────────────────────────────────────────────────────
-  const set = (field: keyof RegistrationFormData, value: string | boolean) => {
+  const set = (field: keyof InscripcionFormData, value: string | boolean) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: undefined }));
   };
 
-  const fieldClass = (field: keyof RegistrationFormData) =>
+  const fieldClass = (field: keyof InscripcionFormData) =>
     `form-control${errors[field] ? ' is-invalid' : ''}`;
 
-  const selectClass = (field: keyof RegistrationFormData) =>
+  const selectClass = (field: keyof InscripcionFormData) =>
     `form-select${errors[field] ? ' is-invalid' : ''}`;
 
   // ── Validation ──────────────────────────────────────────────────────────────
   function validate(): boolean {
-    const newErrors: RegistrationFormErrors = {};
+    const newErrors: InscripcionFormErrors = {};
 
-    if (!form.nombreCompleto.trim()) newErrors.nombreCompleto = 'Campo requerido';
+    if (!form.nombres.trim()) newErrors.nombres = 'Campo requerido';
+    if (!form.apellidos.trim()) newErrors.apellidos = 'Campo requerido';
     if (!form.cedula.trim() || !/^\d{7,10}$/.test(form.cedula))
       newErrors.cedula = 'Ingrese una cédula válida (7-10 dígitos)';
     if (!form.correo.trim() || !form.correo.endsWith('@udea.edu.co'))
       newErrors.correo = 'Debe ser un correo institucional @udea.edu.co';
     if (!form.telefono.trim() || !/^\d{10}$/.test(form.telefono))
       newErrors.telefono = 'Ingrese un teléfono válido (10 dígitos)';
-    if (!form.facultad) newErrors.facultad = 'Seleccione una facultad';
     if (!form.programa.trim()) newErrors.programa = 'Campo requerido';
     if (!form.semestre) newErrors.semestre = 'Seleccione un semestre';
     if (!form.motivacion.trim()) newErrors.motivacion = 'Campo requerido';
-    if (!form.aceptoTerminos) newErrors.aceptoTerminos = 'Debe aceptar los términos';
+    if (!form.aceptaTerminos) newErrors.aceptaTerminos = 'Debe aceptar los términos';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -126,16 +129,18 @@ export default function RegistrationModal({
     if (step === 1) {
       setStep(2);
     } else if (step === 2) {
-      if (!validate()) {
-        alert('Por favor complete todos los campos requeridos correctamente.');
-        return;
-      }
-      if (semillero) {
-        setSubmitting(true);
-        await submitRegistration(semillero, form);
+      if (!validate()) return;
+      if (semilleroId == null) return;
+      setSubmitting(true);
+      setSubmitError(null);
+      try {
+        await submitInscripcion(semilleroId, form);
+        setStep(3);
+      } catch (err) {
+        setSubmitError(err instanceof Error ? err.message : 'Error al enviar la inscripción.');
+      } finally {
         setSubmitting(false);
       }
-      setStep(3);
     } else {
       instanceRef.current?.hide();
     }
@@ -169,7 +174,7 @@ export default function RegistrationModal({
             {step === 1 && (
               <div>
                 <StepIndicator current={1} />
-                <h5 className="mb-3">{semillero?.nombre}</h5>
+                <h5 className="mb-3">{semilleroNombre}</h5>
                 <div
                   className="alert alert-info"
                   style={{
@@ -200,18 +205,39 @@ export default function RegistrationModal({
             {step === 2 && (
               <div>
                 <StepIndicator current={2} />
+                {submitError && (
+                  <div className="alert alert-danger mb-3">
+                    <i className="bi bi-exclamation-triangle me-2"></i>
+                    {submitError}
+                  </div>
+                )}
                 <form noValidate>
                   <div className="row">
                     <div className="col-md-6 mb-3">
-                      <label className="form-label">Nombre completo *</label>
+                      <label className="form-label">Nombres *</label>
                       <input
                         type="text"
-                        className={fieldClass('nombreCompleto')}
-                        value={form.nombreCompleto}
-                        onChange={(e) => set('nombreCompleto', e.target.value)}
+                        className={fieldClass('nombres')}
+                        placeholder="Ej: María Camila"
+                        value={form.nombres}
+                        onChange={(e) => set('nombres', e.target.value)}
                       />
-                      {errors.nombreCompleto && (
-                        <div className="invalid-feedback d-block">{errors.nombreCompleto}</div>
+                      {errors.nombres && (
+                        <div className="invalid-feedback d-block">{errors.nombres}</div>
+                      )}
+                    </div>
+
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Apellidos *</label>
+                      <input
+                        type="text"
+                        className={fieldClass('apellidos')}
+                        placeholder="Ej: Gómez Restrepo"
+                        value={form.apellidos}
+                        onChange={(e) => set('apellidos', e.target.value)}
+                      />
+                      {errors.apellidos && (
+                        <div className="invalid-feedback d-block">{errors.apellidos}</div>
                       )}
                     </div>
 
@@ -260,27 +286,6 @@ export default function RegistrationModal({
                     </div>
 
                     <div className="col-md-6 mb-3">
-                      <label className="form-label">Facultad *</label>
-                      <select
-                        className={selectClass('facultad')}
-                        value={form.facultad}
-                        onChange={(e) => set('facultad', e.target.value)}
-                      >
-                        <option value="">Seleccione una facultad</option>
-                        <option>Facultad de Ciencias Económicas</option>
-                        <option>Facultad de Ingeniería</option>
-                        <option>Facultad de Medicina</option>
-                        <option>Facultad de Educación</option>
-                        <option>Facultad de Ciencias Exactas</option>
-                        <option>Facultad de Ciencias Sociales</option>
-                        <option>Otra</option>
-                      </select>
-                      {errors.facultad && (
-                        <div className="invalid-feedback d-block">{errors.facultad}</div>
-                      )}
-                    </div>
-
-                    <div className="col-md-6 mb-3">
                       <label className="form-label">Programa académico *</label>
                       <input
                         type="text"
@@ -292,17 +297,6 @@ export default function RegistrationModal({
                       {errors.programa && (
                         <div className="invalid-feedback d-block">{errors.programa}</div>
                       )}
-                    </div>
-
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Institución</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Ej: Universidad de Antioquia"
-                        value={form.institucion}
-                        onChange={(e) => set('institucion', e.target.value)}
-                      />
                     </div>
 
                     <div className="col-md-6 mb-3">
@@ -340,34 +334,21 @@ export default function RegistrationModal({
                     </div>
 
                     <div className="col-12 mb-3">
-                      <label className="form-label">
-                        Experiencia previa en investigación (si aplica)
-                      </label>
-                      <textarea
-                        className="form-control"
-                        rows={2}
-                        placeholder="Describa cualquier experiencia previa en investigación, proyectos, publicaciones, etc..."
-                        value={form.experiencia}
-                        onChange={(e) => set('experiencia', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="col-12 mb-3">
                       <div className="form-check">
                         <input
-                          className={`form-check-input${errors.aceptoTerminos ? ' is-invalid' : ''}`}
+                          className={`form-check-input${errors.aceptaTerminos ? ' is-invalid' : ''}`}
                           type="checkbox"
-                          id="aceptoTerminos"
-                          checked={form.aceptoTerminos}
-                          onChange={(e) => set('aceptoTerminos', e.target.checked)}
+                          id="aceptaTerminos"
+                          checked={form.aceptaTerminos}
+                          onChange={(e) => set('aceptaTerminos', e.target.checked)}
                         />
-                        <label className="form-check-label" htmlFor="aceptoTerminos">
+                        <label className="form-check-label" htmlFor="aceptaTerminos">
                           Autorizo el tratamiento de mis datos personales según la Política de
                           Protección de Datos de la Universidad de Antioquia y acepto que mi
                           solicitud será enviada al coordinador del semillero para su validación.
                         </label>
-                        {errors.aceptoTerminos && (
-                          <div className="invalid-feedback d-block">{errors.aceptoTerminos}</div>
+                        {errors.aceptaTerminos && (
+                          <div className="invalid-feedback d-block">{errors.aceptaTerminos}</div>
                         )}
                       </div>
                     </div>

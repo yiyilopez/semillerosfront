@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Tooltip } from 'bootstrap';
-import type { FilterValues } from '../types';
+import type { FilterValues, FiltroItem } from '../types';
+import { getUnidades, getCampus, getAreasOcde } from '../api/semillerosApi';
 
 interface FiltersSectionProps {
   onFilter: (filters: FilterValues) => void;
@@ -8,20 +9,27 @@ interface FiltersSectionProps {
 
 export default function FiltersSection({ onFilter }: FiltersSectionProps) {
   const [filters, setFilters] = useState<FilterValues>({
-    unidad: '',
-    area: '',
-    campus: '',
-    search: '',
+    idUnidad: '',
+    idArea: '',
+    idCampus: '',
+    q: '',
   });
 
-  // Initialize Bootstrap tooltips
+  const [unidades, setUnidades] = useState<FiltroItem[]>([]);
+  const [campus, setCampus] = useState<FiltroItem[]>([]);
+  const [areas, setAreas] = useState<FiltroItem[]>([]);
+
+  useEffect(() => {
+    getUnidades().then(setUnidades).catch(() => {});
+    getCampus().then(setCampus).catch(() => {});
+    getAreasOcde().then(setAreas).catch(() => {});
+  }, []);
+
   const sectionRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!sectionRef.current) return;
     const tooltipEls = sectionRef.current.querySelectorAll('[data-bs-toggle="tooltip"]');
-    const instances = Array.from(tooltipEls).map(
-      (el) => new Tooltip(el)
-    );
+    const instances = Array.from(tooltipEls).map((el) => new Tooltip(el));
     return () => instances.forEach((t) => t.dispose());
   }, []);
 
@@ -45,16 +53,15 @@ export default function FiltersSection({ onFilter }: FiltersSectionProps) {
             </label>
             <select
               className="form-select"
-              value={filters.unidad}
-              onChange={(e) => handleChange('unidad', e.target.value)}
+              value={filters.idUnidad}
+              onChange={(e) => handleChange('idUnidad', e.target.value)}
             >
               <option value="">Todas las unidades</option>
-              <option value="Facultad de Ciencias Económicas">
-                Facultad de Ciencias Económicas
-              </option>
-              <option value="Facultad de Ingeniería">Facultad de Ingeniería</option>
-              <option value="Facultad de Ciencias Exactas">Facultad de Ciencias Exactas</option>
-              <option value="Facultad de Ciencias Sociales">Facultad de Ciencias Sociales</option>
+              {unidades.map((u) => (
+                <option key={u.id} value={String(u.id)}>
+                  {u.nombre}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -69,14 +76,15 @@ export default function FiltersSection({ onFilter }: FiltersSectionProps) {
             </label>
             <select
               className="form-select"
-              value={filters.area}
-              onChange={(e) => handleChange('area', e.target.value)}
+              value={filters.idArea}
+              onChange={(e) => handleChange('idArea', e.target.value)}
             >
               <option value="">Todas las áreas</option>
-              <option value="Ciencias sociales">Ciencias sociales</option>
-              <option value="Ciencias naturales">Ciencias naturales</option>
-              <option value="Ingeniería y tecnología">Ingeniería y tecnología</option>
-              <option value="Ciencias médicas">Ciencias médicas</option>
+              {areas.map((a) => (
+                <option key={a.id} value={String(a.id)}>
+                  {a.nombre}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -84,20 +92,15 @@ export default function FiltersSection({ onFilter }: FiltersSectionProps) {
             <label className="form-label">Campus</label>
             <select
               className="form-select"
-              value={filters.campus}
-              onChange={(e) => handleChange('campus', e.target.value)}
+              value={filters.idCampus}
+              onChange={(e) => handleChange('idCampus', e.target.value)}
             >
-              <option value="">Medellín</option>
-              <option value="">El Carmen de Viboral (Oriente)</option>
-              <option value="">Urabá (Apartadó/Turbo)</option>
-              <option value="">Caucasia (Bajo Cauca)</option>
-              <option value="">Andes (Suroeste)</option>
-              <option value="">Santa Fe de Antioquia (Occidente)</option>
-              <option value="">Puerto Berrío (Magdalena Medio)</option>
-              <option value="">Sonsón</option>
-              <option value="">Amalfi</option>
-              <option value="">Segovia</option>
-              <option value="">Yarumal</option>
+              <option value="">Todos los campus</option>
+              {campus.map((c) => (
+                <option key={c.id} value={String(c.id)}>
+                  {c.nombre}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -107,8 +110,8 @@ export default function FiltersSection({ onFilter }: FiltersSectionProps) {
               type="text"
               className="form-control"
               placeholder="Ej: finanzas, investigación, tecnología..."
-              value={filters.search}
-              onChange={(e) => handleChange('search', e.target.value)}
+              value={filters.q}
+              onChange={(e) => handleChange('q', e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && onFilter(filters)}
             />
           </div>
