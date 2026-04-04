@@ -20,16 +20,22 @@ export default function Header({ onScrollToFilters }: HeaderProps) {
               <button className="btn btn-outline-light" onClick={onScrollToFilters}>
                 <i className="bi bi-funnel me-1"></i>Filtrar
               </button>
-              <a
-                href="login.html"
+              <button
                 className="btn btn-light"
                 style={{ color: 'var(--udea-verde-oscuro)' }}
+                disabled
+                title="Disponible en el próximo sprint"
               >
                 <i className="bi bi-box-arrow-in-right me-1"></i>Acceso SIGSI
-              </a>
-              <a href="registrosemillero3.html" className="btn-crear-semillero">
+              </button>
+              <button
+                className="btn-crear-semillero"
+                disabled
+                title="Disponible en el próximo sprint"
+                style={{ opacity: 0.5, cursor: 'not-allowed' }}
+              >
                 <i className="bi bi-plus-circle-fill"></i>Crear Semillero
-              </a>
+              </button>
             </div>
           </div>
         </div>
