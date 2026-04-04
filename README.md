@@ -4,7 +4,7 @@ Frontend del portal de semilleros de la Universidad de Antioquia, desarrollado c
 
 ## ¿De qué trata esto?
 
-Interfaz web para que estudiantes puedan consultar los semilleros de investigación activos de la UdeA, ver sus detalles y solicitar inscripción. Se conecta al backend [semilleros-udea](../semilleros-udea-master) vía REST.
+Interfaz web para que estudiantes puedan consultar los semilleros de investigación activos de la UdeA, ver sus detalles y solicitar inscripción. 
 
 ## Tecnologías usadas
 
@@ -18,21 +18,21 @@ Interfaz web para que estudiantes puedan consultar los semilleros de investigaci
 ```
 src/
 ├── api/
-│   └── semillerosApi.ts      # llamadas al backend (fetch sobre BASE_URL)
+│   └── semillerosApi.ts      
 ├── types/
-│   └── index.ts              # tipos que mapean los DTOs del backend
+│   └── index.ts              
 ├── styles/
-│   └── udea.css              # estilos propios con la paleta de la UdeA
+│   └── udea.css              
 ├── components/
 │   ├── Header.tsx
-│   ├── FiltersSection.tsx    # dropdowns cargados desde /api/v1/filtros/*
+│   ├── FiltersSection.tsx    
 │   ├── SemilleroCard.tsx
 │   ├── SemilleroList.tsx
-│   ├── DetailsModal.tsx      # fetcha /api/v1/semilleros/{id} al abrirse
-│   ├── RegistrationModal.tsx # formulario de inscripción en 3 pasos
+│   ├── DetailsModal.tsx      
+│   ├── RegistrationModal.tsx 
 │   └── Footer.tsx
 ├── pages/
-│   └── HomePage.tsx          # página principal con paginación
+│   └── HomePage.tsx          
 └── App.tsx
 ```
 
