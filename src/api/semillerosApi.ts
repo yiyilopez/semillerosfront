@@ -1,8 +1,12 @@
 import type {
+  CaptchaResponse,
   FiltroItem,
   FilterValues,
+  GuardarGeneralPayload,
   InscripcionFormData,
+  LoginResponse,
   PageResponse,
+  SemilleroCoordinador,
   SemilleroDetalle,
   SemilleroResumen,
 } from '../types';
@@ -61,4 +65,69 @@ export async function getCampus(): Promise<FiltroItem[]> {
 
 export async function getAreasOcde(): Promise<FiltroItem[]> {
   return apiFetch<FiltroItem[]>('/api/v1/filtros/areas-ocde');
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+export async function getCaptcha(): Promise<CaptchaResponse> {
+  return apiFetch<CaptchaResponse>('/api/v1/auth/captcha-math');
+}
+
+export async function loginCoordinador(
+  correo: string,
+  password: string,
+  respuestaMath: number,
+  operando1: number,
+  operando2: number,
+): Promise<LoginResponse> {
+  return apiFetch<LoginResponse>('/api/v1/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ correo, password, respuestaMath, operando1, operando2 }),
+  });
+}
+
+// ── Coordinador: gestión de semilleros ────────────────────────────────────────
+function authHeaders(token: string) {
+  return { Authorization: `Bearer ${token}` };
+}
+
+export async function iniciarCaracterizacion(token: string): Promise<SemilleroCoordinador> {
+  return apiFetch<SemilleroCoordinador>('/api/v1/coordinador/semilleros/iniciar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+  });
+}
+
+export async function getMiSemillero(token: string): Promise<SemilleroCoordinador> {
+  return apiFetch<SemilleroCoordinador>('/api/v1/coordinador/semilleros/mi-semillero', {
+    headers: authHeaders(token),
+  });
+}
+
+export async function guardarPestanaGeneral(
+  idSemillero: number,
+  payload: GuardarGeneralPayload,
+  token: string,
+): Promise<SemilleroCoordinador> {
+  return apiFetch<SemilleroCoordinador>(
+    `/api/v1/coordinador/semilleros/${idSemillero}/pestana/general`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function finalizarCaracterizacion(
+  idSemillero: number,
+  token: string,
+): Promise<SemilleroCoordinador> {
+  return apiFetch<SemilleroCoordinador>(
+    `/api/v1/coordinador/semilleros/${idSemillero}/finalizar`,
+    {
+      method: 'POST',
+      headers: authHeaders(token),
+    },
+  );
 }

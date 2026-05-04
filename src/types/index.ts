@@ -76,3 +76,57 @@ export interface FilterValues {
   idCampus: string;
   q: string;
 }
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+export interface CaptchaResponse {
+  operando1: number;
+  operando2: number;
+  operacion: string;
+  pregunta: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  tipo: string;
+  correo: string;
+  idCoordinador: number;
+}
+
+// ── Semillero del Coordinador ─────────────────────────────────────────────────
+export interface SemilleroCoordinador {
+  id: number;
+  codigo: string;
+  nombre: string | null;
+  siglas: string | null;
+  correoSemillero: string | null;
+  telefono: string | null;
+  anioCreacion: number | null;
+  mision: string | null;
+  vision: string | null;
+  objetivo: string | null;
+  lineasInvestigacion: string | null;
+  palabrasClave: string | null;
+  grupoInvestigacion: string | null;
+  estado: string;
+  estadoCaracterizacion: string | null;
+  facultad: string | null;
+  campus: string | null;
+  areaOcde: string | null;
+}
+
+export interface GuardarGeneralPayload {
+  nombre: string;
+  siglas?: string;
+  correoSemillero: string;
+  telefono?: string;
+  anioCreacion?: number;
+  mision: string;
+  vision: string;
+  objetivo: string;
+  lineasInvestigacion?: string;
+  palabrasClave?: string;
+  grupoInvestigacion?: string;
+  idUnidadAcademica: number;
+  idCampus: number;
+  idAreaOcde: number;
+}
