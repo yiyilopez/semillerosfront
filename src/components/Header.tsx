@@ -1,8 +1,9 @@
 interface HeaderProps {
   onScrollToFilters: () => void;
+  onAccesoSigsi: () => void;
 }
 
-export default function Header({ onScrollToFilters }: HeaderProps) {
+export default function Header({ onScrollToFilters, onAccesoSigsi }: HeaderProps) {
   return (
     <header className="udea-header">
       <div className="container">
@@ -23,8 +24,7 @@ export default function Header({ onScrollToFilters }: HeaderProps) {
               <button
                 className="btn btn-light"
                 style={{ color: 'var(--udea-verde-oscuro)' }}
-                disabled
-                title="Disponible en el próximo sprint"
+                onClick={onAccesoSigsi}
               >
                 <i className="bi bi-box-arrow-in-right me-1"></i>Acceso SIGSI
               </button>

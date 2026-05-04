@@ -10,7 +10,11 @@ import Footer from '../components/Footer';
 
 const EMPTY_FILTERS: FilterValues = { idUnidad: '', idArea: '', idCampus: '', q: '' };
 
-export default function HomePage() {
+interface HomePageProps {
+  onAccesoSigsi: () => void;
+}
+
+export default function HomePage({ onAccesoSigsi }: HomePageProps) {
   const [semilleros, setSemilleros] = useState<SemilleroResumen[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +81,7 @@ export default function HomePage() {
 
   return (
     <>
-      <Header onScrollToFilters={scrollToFilters} />
+      <Header onScrollToFilters={scrollToFilters} onAccesoSigsi={onAccesoSigsi} />
 
       <main className="container py-4">
         {/* Intro + stats */}
