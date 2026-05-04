@@ -129,7 +129,7 @@ export default function CaracterizacionPage({ token, correoCoordinador, onLogout
     }
   }
 
-  const canFinalizar = savedTabs.has(0) && !finalizado;
+  const canFinalizar = savedTabs.size === TABS.length && !finalizado;
 
   // ── Loading / error ───────────────────────────────────────────────────────
   if (loading) {
@@ -276,15 +276,6 @@ export default function CaracterizacionPage({ token, correoCoordinador, onLogout
           </div>
         </div>
 
-        {/* Finalizar desde cualquier tab (si ya guardó General) */}
-        {canFinalizar && activeTab < 6 && (
-          <div className="text-end mt-3">
-            <button className="btn btn-success btn-sm fw-semibold" onClick={handleFinalizar} disabled={saving}>
-              {saving ? <span className="spinner-border spinner-border-sm me-2"></span> : null}
-              ✓ Finalizar Caracterización (desde aquí)
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
