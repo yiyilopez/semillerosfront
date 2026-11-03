@@ -54,7 +54,7 @@ describe('ReportsPage - administrador', () => {
     expect(screen.getByRole('heading', { name: 'Evolución Semilleros' })).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Asistencia a actividades' })).toHaveAttribute('aria-valuenow', '90');
     expect(screen.getByRole('progressbar', { name: 'Asistencia de Robótica' })).toHaveAttribute('aria-valuenow', '87.5');
-    expect(screen.getByText(/Filtros aplicados: 2025-1 · Facultad/)).toBeInTheDocument();
+    expect(screen.getByText(/Filtros de los datos mostrados: 2025-1 · Facultad/)).toBeInTheDocument();
   });
 
   it('aplica filtros con el botón, actualiza gráficos y tabla y guarda la selección en la URL (HU2, HU14)', async () => {
@@ -115,7 +115,7 @@ describe('ReportsPage - exportación e impresión', () => {
     renderAdmin();
     await screen.findByRole('rowheader', { name: /Robótica/ });
     fireEvent.click(screen.getByRole('button', { name: 'Exportar Excel' }));
-    expect(exportarReporte).toHaveBeenCalledWith('xlsx', { ...EMPTY_FILTERS, periodo: '2026' }, { orden: 'nombre', direccion: 'asc' }, 'tok');
+    expect(exportarReporte).toHaveBeenCalledWith('xlsx', { ...EMPTY_FILTERS, periodo: '2026' }, { orden: 'nombre', direccion: 'asc' }, 'tok', expect.any(AbortSignal));
     expect(screen.getByText(/Generando el archivo XLSX/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Exportar PDF' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Actualizar datos' })).toBeEnabled();
@@ -159,7 +159,7 @@ describe('ReportsPage - actualización en tiempo real (HU13)', () => {
     vi.mocked(escucharEventosReportes).mockImplementation((_token, onEvento) => { emitir = onEvento; return new Promise(() => {}); });
     renderAdmin();
     await screen.findByRole('rowheader', { name: /Robótica/ });
-    expect(escucharEventosReportes).toHaveBeenCalledWith('tok', expect.any(Function), expect.any(AbortSignal));
+    expect(escucharEventosReportes).toHaveBeenCalledWith('tok', expect.any(Function), expect.any(AbortSignal), expect.any(Function));
     act(() => emitir({ evento: 'conectado', datos: '{}' }));
     expect(screen.getByText('Actualización automática activa')).toBeInTheDocument();
     vi.mocked(getDashboard).mockResolvedValue({ ...dashboard, kpis: { ...dashboard.kpis, semillerosActivos: 8 } });
@@ -210,4 +210,54 @@ it('retira el aviso de descarga tras seis segundos y permite cerrarlo manualment
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar notificación de descarga' }));
     expect(screen.queryByText('Se descargó reporte.xlsx.')).not.toBeInTheDocument();
   } finally { vi.useRealTimers(); }
+});
+
+it('conserva tabla e indicadores y no anuncia éxito si una actualización SSE falla', async () => {
+  let emitir: (evento: { evento: string; datos: string }) => void = () => {};
+  vi.mocked(escucharEventosReportes).mockImplementation((_token, onEvento) => { emitir = onEvento; return new Promise(() => {}); });
+  renderAdmin();
+  await screen.findByRole('rowheader', { name: /Robótica/ });
+  vi.mocked(getRendimiento).mockRejectedValue(new Error('offline'));
+  act(() => emitir({ evento: 'datos-actualizados', datos: '{}' }));
+  expect(await screen.findByText(/No se pudo actualizar la tabla/)).toBeInTheDocument();
+  expect(screen.getByRole('rowheader', { name: /Robótica/ })).toBeInTheDocument();
+  expect(screen.queryByText('Los datos han sido actualizados')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Imprimir' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Exportar PDF' })).toBeDisabled();
+});
+it('comprueba datos al intervalo elegido y cancela el temporizador al salir', async () => {
+  const view = renderAdmin();
+  await screen.findByRole('rowheader', { name: /Robótica/ });
+  vi.useFakeTimers();
+  try {
+    fireEvent.change(screen.getByLabelText('Comprobar datos automáticamente'), { target: { value: '1' } });
+    const llamadas = vi.mocked(getDashboard).mock.calls.length;
+    await act(async () => { vi.advanceTimersByTime(60_000); });
+    expect(getDashboard).toHaveBeenCalledTimes(llamadas + 1);
+    expect(screen.getByText('Los datos han sido actualizados')).toBeInTheDocument();
+    view.unmount();
+    await act(async () => { vi.advanceTimersByTime(60_000); });
+    expect(getDashboard).toHaveBeenCalledTimes(llamadas + 1);
+  } finally { vi.useRealTimers(); }
+});
+it('cancela la exportación al salir para evitar descargas posteriores al cierre de sesión', async () => {
+  let terminar: (value: { nombre: string; archivo: Blob }) => void = () => {};
+  vi.mocked(exportarReporte).mockImplementation(() => new Promise(resolve => { terminar = resolve; }));
+  const view = renderAdmin();
+  await screen.findByRole('rowheader', { name: /Robótica/ });
+  fireEvent.click(screen.getByRole('button', { name: 'Exportar CSV' }));
+  const signal = vi.mocked(exportarReporte).mock.calls[0][4];
+  view.unmount();
+  expect(signal?.aborted).toBe(true);
+  await act(async () => { terminar({ nombre: 'reporte.csv', archivo: new Blob(['x']) }); });
+  expect(descargarArchivo).not.toHaveBeenCalled();
+});
+it('mantiene los filtros de los datos anteriores si la nueva selección no se puede cargar', async () => {
+  renderAdmin();
+  await screen.findByRole('rowheader', { name: /Robótica/ });
+  vi.mocked(getDashboard).mockRejectedValue(new Error('offline'));
+  fireEvent.change(screen.getByLabelText('Período académico'), { target: { value: '2025' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Aplicar filtros' }));
+  await screen.findByText(/No pudimos consultar los indicadores/);
+  expect(screen.getByText(/Filtros de los datos mostrados:/)).toHaveTextContent('Estado actual');
 });

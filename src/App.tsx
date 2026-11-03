@@ -4,14 +4,15 @@ import HomePage from './pages/HomePage';
 import ReportsPage from './pages/ReportsPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import { clearReportFilters } from './reports/filters';
-import { isAdminToken } from './auth/role';
+import { isAdminToken, tokenRole, tokenExpired, tokenClaims } from './auth/role';
+import SemilleristaPage from './pages/SemilleristaPage';
 import LoginPage from './pages/LoginPage';
 import CoordinadorHomePage from './pages/CoordinadorHomePage';
 import CaracterizacionPage from './pages/CaracterizacionPage';
 import AsistenciaPage from './pages/AsistenciaPage';
 import EnlaceAccesoPage, { type AccionEnlace } from './pages/EnlaceAccesoPage';
 
-type View = 'home' | 'login' | 'coordinador' | 'caracterizacion' | 'admin' | 'reportes' | 'asistencia' | 'enlace';
+type View = 'semillerista' | 'home' | 'login' | 'coordinador' | 'caracterizacion' | 'admin' | 'reportes' | 'asistencia' | 'enlace';
 
 const AUTH_STORAGE_KEY = 'sigsi_auth';
 const SELECTED_SEMILLERO_KEY = 'sigsi_selected_semillero';
@@ -34,7 +35,9 @@ function readStoredAuth(): LoginResponse | null {
       return null;
     }
 
-    return JSON.parse(rawAuth) as LoginResponse;
+    const parsed = JSON.parse(rawAuth) as LoginResponse;
+    if (!parsed?.token || !tokenRole(parsed.token) || tokenExpired(parsed.token)) { clearStoredSession(); return null; }
+    return parsed;
   } catch {
     clearStoredSession();
     return null;
@@ -82,6 +85,7 @@ export default function App() {
     if (!storedAuth) return vista === 'reportes' ? 'login' : 'home';
     if (vista === 'reportes') return 'reportes';
     if (isAdminToken(storedAuth.token)) return 'admin';
+    if (tokenRole(storedAuth.token) === 'SEMILLERISTA') return 'semillerista';
     return readStoredSemilleroId() != null ? 'caracterizacion' : 'coordinador';
   });
   const [avisoInactividad, setAvisoInactividad] = useState(false);
@@ -95,12 +99,15 @@ export default function App() {
   }
 
   function leaveReports(next: View) {
-    clearReportFilters();
+    if (next === 'coordinador') { sessionStorage.removeItem(SELECTED_SEMILLERO_KEY); setSelectedSemilleroId(null); }
     writeVistaUrl(null);
     setView(next);
   }
 
   function handleLoginSuccess(response: LoginResponse) {
+    if (!tokenRole(response.token) || tokenExpired(response.token)) {
+      clearStoredSession(); setAuth(null); setAvisoLogin('Tu cuenta no tiene un rol habilitado o la sesión venció. Inicia sesión de nuevo.'); setView('login'); return;
+    }
     clearReportFilters();
     sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(response));
     sessionStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
@@ -114,7 +121,7 @@ export default function App() {
       openReports();
       return;
     }
-    setView(isAdminToken(response.token) ? 'admin' : 'coordinador');
+    setView(tokenRole(response.token) === 'ADMIN' ? 'admin' : tokenRole(response.token) === 'SEMILLERISTA' ? 'semillerista' : 'coordinador');
   }
 
   function handleLogout(message?: string) {
@@ -180,7 +187,18 @@ export default function App() {
     };
   }, [auth]);
 
+  useEffect(() => {
+    const exp = auth && tokenClaims(auth.token)?.exp;
+    if (typeof exp !== 'number') return;
+    const timer = window.setTimeout(() => handleLogout('Tu sesión venció. Inicia sesión de nuevo.'), Math.max(0, exp * 1000 - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [auth]);
+
   function renderView() {
+  if (auth && tokenRole(auth.token) === 'SEMILLERISTA') {
+    return <SemilleristaPage reportes={view === 'reportes'} correo={auth.correo} onReports={openReports}
+      onBack={() => leaveReports('semillerista')} onLogout={() => handleLogout()} />;
+  }
   // HU12: el mismo tablero con el alcance del rol del token; el backend valida el rol (RN42).
   if (view === 'reportes' && auth) {
     const esAdmin = isAdminToken(auth.token);
@@ -231,6 +249,7 @@ export default function App() {
         correo={auth.correo}
         idSemillero={semilleroAsistencia.id}
         nombreSemillero={semilleroAsistencia.nombre}
+        onReports={openReports}
         onBack={() => { setSemilleroAsistencia(null); setView('coordinador'); }}
         onLogout={() => handleLogout()}
       />
@@ -243,6 +262,7 @@ export default function App() {
         token={auth.token}
         correoCoordinador={auth.correo}
         semilleroId={selectedSemilleroId}
+        onReports={openReports}
         onBack={handleBackToCoordinador}
         onLogout={() => handleLogout()}
       />

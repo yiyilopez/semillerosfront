@@ -33,3 +33,30 @@ it('no se conecta si está inactivo o no hay token', () => {
   expect(result.current).toBe('inactivo');
   expect(escucharEventosReportes).not.toHaveBeenCalled();
 });
+
+it('detecta un flujo sin latidos, aborta y reintenta sin duplicar conexiones', async () => {
+  vi.mocked(escucharEventosReportes).mockImplementation((_token, emitir) => {
+    emitir({ evento: 'conectado', datos: '{"intervaloMs":60000}' }); return new Promise(() => {});
+  });
+  const { result, unmount } = renderHook(() => useEventosReportes('tok', true, () => {}));
+  const signal = vi.mocked(escucharEventosReportes).mock.calls[0][2];
+  act(() => vi.advanceTimersByTime(150_000));
+  expect(result.current).toBe('error');
+  expect(signal.aborted).toBe(true);
+  act(() => vi.advanceTimersByTime(REINTENTO_MS));
+  expect(escucharEventosReportes).toHaveBeenCalledTimes(2);
+  expect(result.current).toBe('conectado');
+  unmount();
+});
+it('renueva la vigilancia al recibir un latido y propaga errores enviados por el servidor', () => {
+  let latido = () => {};
+  let emitir: (evento: { evento: string; datos: string }) => void = () => {};
+  vi.mocked(escucharEventosReportes).mockImplementation((_token, callback, _signal, actividad) => {
+    latido = actividad!; emitir = callback; callback({ evento: 'conectado', datos: '{}' }); return new Promise(() => {});
+  });
+  const { result } = renderHook(() => useEventosReportes('tok', true, () => {}));
+  act(() => { vi.advanceTimersByTime(100_000); latido(); vi.advanceTimersByTime(100_000); });
+  expect(result.current).toBe('conectado');
+  act(() => emitir({ evento: 'error', datos: '{}' }));
+  expect(result.current).toBe('error');
+});

@@ -42,7 +42,8 @@ function Porcentaje({ conteo, etiqueta }: { conteo: ConteoAsistencia; etiqueta: 
 
 // Registro de actividades y asistencia del semillero por parte de su coordinador.
 // % asistencia = presentes / (presentes + ausentes); las ausencias excusadas se descuentan.
-export default function AsistenciaPage({ token, correo, idSemillero, nombreSemillero, onBack, onLogout }: {
+export default function AsistenciaPage({ token, correo, idSemillero, nombreSemillero, onBack, onLogout, onReports }: {
+  onReports?: () => void;
   token: string; correo?: string; idSemillero: number; nombreSemillero: string; onBack: () => void; onLogout: () => void;
 }) {
   const [periodo, setPeriodo] = useState('');
@@ -135,6 +136,9 @@ export default function AsistenciaPage({ token, correo, idSemillero, nombreSemil
       <div><div className="udea-logo mb-1">UdeA <span>SIGSI</span></div><div className="system-title">{nombreSemillero}</div><span className="sigsi-badge">ASISTENCIA</span></div>
       <div className="d-flex gap-2 flex-wrap align-items-center">
         {correo && <span className="text-white small me-2">{correo}</span>}
+        {onReports && <button className="btn btn-outline-light" disabled={guardando} onClick={() => {
+          if (!formulario || window.confirm('¿Abrir reportes? Los cambios sin guardar en la actividad se perderán.')) onReports();
+        }}>Reportes</button>}
         <button className="btn btn-outline-light" onClick={onBack}>← Volver a mis semilleros</button>
         <button className="btn btn-outline-light" onClick={onLogout}>Cerrar sesión</button>
       </div>

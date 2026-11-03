@@ -37,6 +37,7 @@ interface Props {
   token: string;
   correoCoordinador: string;
   semilleroId: number;
+  onReports?: () => void;
   onBack: () => void;
   onLogout: () => void;
 }
@@ -124,6 +125,7 @@ export default function CaracterizacionPage({
   semilleroId,
   onBack,
   onLogout,
+  onReports,
 }: Props) {
   const [activeTab, setActiveTab] = useState(0);
   const [semillero, setSemillero] = useState<SemilleroCoordinador | null>(null);
@@ -515,6 +517,9 @@ export default function CaracterizacionPage({
               <div className="small text-white opacity-75 mb-1">
                 <i className="bi bi-shield-check me-1"></i>{correoCoordinador}
               </div>
+              {onReports && <button className="btn btn-light btn-sm me-2" disabled={saving || autoSaving} onClick={() => {
+                if (window.confirm('¿Abrir reportes? Los cambios sin guardar en la caracterización se perderán.')) onReports();
+              }}>Reportes</button>}
               <button className="btn btn-outline-light btn-sm" onClick={onLogout}>
                 <i className="bi bi-box-arrow-left me-1"></i>Cerrar sesión
               </button>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { getCampus, getUnidades } from '../api/semillerosApi';
 import {
@@ -57,10 +57,14 @@ export default function ReportsPage({ alcance, token, correo, onBack, onLogout }
   const [exportando, setExportando] = useState<FormatoExportacion | null>(null);
   const [exportResultado, setExportResultado] = useState<{ ok: boolean; texto: string } | null>(null);
   const [impresoEn, setImpresoEn] = useState<Date | null>(null);
+  const [intervalo, setIntervalo] = useState(5);
+  const actualizacionAutomatica = useRef(false);
+  const exportController = useRef<AbortController | null>(null);
+  const [filtrosMostrados, setFiltrosMostrados] = useState(applied);
   const [avisoActualizado, setAvisoActualizado] = useState(false);
   const enVivo = useEventosReportes(token, alcance === 'ADMIN', () => {
+    actualizacionAutomatica.current = true;
     setRevision(value => value + 1);
-    setAvisoActualizado(true);
   });
 
   const years = Array.from({ length: new Date().getFullYear() - 1999 }, (_, i) => new Date().getFullYear() - i);
@@ -72,27 +76,41 @@ export default function ReportsPage({ alcance, token, correo, onBack, onLogout }
   const tablaError = tablaEstado?.clave === claveTabla && tablaEstado.error;
   const filterError = filtrosEstado?.revision === revision && filtrosEstado.error;
 
-  // Se conservan los datos anteriores mientras se actualiza y si la actualización falla (RN48).
+  // Se actualizan indicadores y tabla juntos; un fallo conserva la última consulta completa.
   useEffect(() => {
     const controller = new AbortController();
-    getDashboard(alcance, applied, token, controller.signal)
-      .then(result => {
-        if (controller.signal.aborted) return;
-        setDashboard(result);
-        setUpdatedAt(new Date());
-        setDashboardEstado({ clave: claveDashboard, error: false });
-      })
-      .catch(() => { if (!controller.signal.aborted) setDashboardEstado({ clave: claveDashboard, error: true }); });
+    Promise.all([
+      getDashboard(alcance, applied, token, controller.signal),
+      getRendimiento(alcance, applied, pagina, orden, token, controller.signal),
+    ]).then(([result, rows]) => {
+      if (controller.signal.aborted) return;
+      setDashboard(result); setTabla(rows); setFiltrosMostrados(applied);
+      setUpdatedAt(new Date());
+      setDashboardEstado({ clave: claveDashboard, error: false });
+      setTablaEstado({ clave: claveTabla, error: false });
+      if (actualizacionAutomatica.current) setAvisoActualizado(true);
+      actualizacionAutomatica.current = false;
+    }).catch(() => {
+      if (controller.signal.aborted) return;
+      setDashboardEstado({ clave: claveDashboard, error: true });
+      setTablaEstado({ clave: claveTabla, error: true });
+      setAvisoActualizado(false);
+      actualizacionAutomatica.current = false;
+    });
     return () => controller.abort();
-  }, [alcance, applied, token, claveDashboard]);
+  }, [alcance, applied, token, pagina, orden, claveDashboard, claveTabla]);
 
+  // Consulta periódica de respaldo: configurable y sin depender de que SSE detecte todos los cambios.
   useEffect(() => {
-    const controller = new AbortController();
-    getRendimiento(alcance, applied, pagina, orden, token, controller.signal)
-      .then(result => { if (!controller.signal.aborted) { setTabla(result); setTablaEstado({ clave: claveTabla, error: false }); } })
-      .catch(() => { if (!controller.signal.aborted) setTablaEstado({ clave: claveTabla, error: true }); });
-    return () => controller.abort();
-  }, [alcance, applied, pagina, orden, token, claveTabla]);
+    if (alcance !== 'ADMIN') return;
+    const timer = window.setInterval(() => {
+      actualizacionAutomatica.current = true;
+      setRevision(value => value + 1);
+    }, intervalo * 60_000);
+    return () => window.clearInterval(timer);
+  }, [alcance, intervalo]);
+
+  useEffect(() => () => exportController.current?.abort(), []);
 
   useEffect(() => {
     let active = true;
@@ -145,19 +163,25 @@ export default function ReportsPage({ alcance, token, correo, onBack, onLogout }
   function exportar(formato: FormatoExportacion) {
     setExportando(formato);
     setExportResultado(null);
-    exportarReporte(formato, applied, orden, token)
+    exportController.current?.abort();
+    const controller = new AbortController();
+    exportController.current = controller;
+    exportarReporte(formato, applied, orden, token, controller.signal)
       .then(({ nombre, archivo }) => {
+        if (controller.signal.aborted) return;
         descargarArchivo(nombre, archivo);
         setExportResultado({ ok: true, texto: `Se descargó ${nombre}.` });
       })
-      .catch((err: Error) => setExportResultado({ ok: false, texto: `No se pudo exportar el reporte: ${err.message}` }))
-      .finally(() => setExportando(null));
+      .catch((err: Error) => { if (!controller.signal.aborted) setExportResultado({ ok: false, texto: `No se pudo exportar el reporte: ${err.message}` }); })
+      .finally(() => { if (!controller.signal.aborted) setExportando(null); });
   }
 
   function aplicar(next: ReportFilters) {
     setFilters(next);
     setApplied(next);
     setPagina(0);
+    setAvisoActualizado(false);
+    actualizacionAutomatica.current = false;
   }
 
   // Los clics en los gráficos filtran el reporte completo y la tabla (HU3, HU4, RN23).
@@ -165,10 +189,10 @@ export default function ReportsPage({ alcance, token, correo, onBack, onLogout }
     aplicar({ ...applied, ...parcial, idSemillero: '' });
   }
 
-  const nombreUnidad = unidades.find(item => String(item.id) === applied.idUnidad)?.nombre ?? (applied.idUnidad ? `Unidad #${applied.idUnidad}` : 'Todas las unidades');
-  const nombreCampus = campus.find(item => String(item.id) === applied.idCampus)?.nombre ?? (applied.idCampus ? `Campus #${applied.idCampus}` : 'Todos los campus');
-  const nombreSemillero = semilleros.find(item => String(item.id) === applied.idSemillero)?.nombre ?? (applied.idSemillero ? `Semillero #${applied.idSemillero}` : 'Todos los semilleros');
-  const resumenFiltros = [applied.periodo || 'Estado actual', applied.tipoUnidad ? NOMBRE_TIPO[applied.tipoUnidad as keyof typeof NOMBRE_TIPO] : 'Todos los tipos', nombreUnidad, nombreCampus, nombreSemillero].join(' · ');
+  const nombreUnidad = unidades.find(item => String(item.id) === filtrosMostrados.idUnidad)?.nombre ?? (filtrosMostrados.idUnidad ? `Unidad #${filtrosMostrados.idUnidad}` : 'Todas las unidades');
+  const nombreCampus = campus.find(item => String(item.id) === filtrosMostrados.idCampus)?.nombre ?? (filtrosMostrados.idCampus ? `Campus #${filtrosMostrados.idCampus}` : 'Todos los campus');
+  const nombreSemillero = semilleros.find(item => String(item.id) === filtrosMostrados.idSemillero)?.nombre ?? (filtrosMostrados.idSemillero ? `Semillero #${filtrosMostrados.idSemillero}` : 'Todos los semilleros');
+  const resumenFiltros = [filtrosMostrados.periodo || 'Estado actual', filtrosMostrados.tipoUnidad ? NOMBRE_TIPO[filtrosMostrados.tipoUnidad as keyof typeof NOMBRE_TIPO] : 'Todos los tipos', nombreUnidad, nombreCampus, nombreSemillero].join(' · ');
   const sinDatos = dashboard !== null && dashboard.kpis.semillerosActivos === 0;
 
   return <div className="admin-dashboard report-page">
@@ -184,10 +208,10 @@ export default function ReportsPage({ alcance, token, correo, onBack, onLogout }
       <div className="admin-page-heading"><div><p className="admin-eyebrow">INDICADORES DEL PROGRAMA</p><h1>Reportes y estadísticas</h1><p className="text-muted mb-0">{TITULOS[alcance].descripcion}</p></div>
         <div className="d-flex flex-wrap gap-2 no-print">
           <button className="btn admin-outline" disabled={loading} onClick={() => setRevision(value => value + 1)}><i className="bi bi-arrow-clockwise me-2" aria-hidden="true" />{loading ? 'Actualizando…' : 'Actualizar datos'}</button>
-          {alcance === 'ADMIN' && FORMATOS.map(({ formato, etiqueta, icono }) => <button key={formato} className="btn admin-outline" disabled={exportando !== null} onClick={() => exportar(formato)}>
+          {alcance === 'ADMIN' && FORMATOS.map(({ formato, etiqueta, icono }) => <button key={formato} className="btn admin-outline" disabled={exportando !== null || loading || !!error || !!tablaError} onClick={() => exportar(formato)}>
             {exportando === formato ? <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" /> : <i className={`bi bi-${icono} me-2`} aria-hidden="true" />}{etiqueta}
           </button>)}
-          <button className="btn btn-udea mt-0" onClick={() => window.print()}><i className="bi bi-printer me-2" aria-hidden="true" />Imprimir</button>
+          <button className="btn btn-udea mt-0" disabled={loading || !!error || !!tablaError || !dashboard} onClick={() => window.print()}><i className="bi bi-printer me-2" aria-hidden="true" />Imprimir</button>
         </div>
       </div>
       {exportando && <p className="report-status no-print" role="status">Generando el archivo {exportando.toUpperCase()} con los filtros aplicados. Puedes seguir consultando el reporte.</p>}
@@ -210,11 +234,15 @@ export default function ReportsPage({ alcance, token, correo, onBack, onLogout }
         {filterError && <p className="text-danger mt-3 mb-0" role="alert">No se cargaron todos los filtros. Pulsa «Actualizar datos» para reintentar.</p>}
       </section>
 
-      {enVivo !== 'inactivo' && <p className={`report-live no-print is-${enVivo}`}><span className="report-live-dot" aria-hidden="true" />{enVivo === 'conectado' ? 'Actualización automática activa' : enVivo === 'error' ? 'Sin conexión para actualizaciones automáticas' : 'Conectando actualizaciones automáticas…'}</p>}
+      {alcance === 'ADMIN' && <div className="no-print mb-3"><label htmlFor="report-refresh" className="form-label me-2">Comprobar datos automáticamente</label>
+        <select id="report-refresh" className="form-select d-inline-block w-auto" value={intervalo} onChange={event => setIntervalo(Number(event.target.value))}>
+          <option value={1}>Cada minuto</option><option value={5}>Cada 5 minutos</option><option value={10}>Cada 10 minutos</option>
+        </select><small className="d-block text-muted">También se actualiza cuando el servidor comunica un cambio.</small></div>}
+      {enVivo !== 'inactivo'  && <p className={`report-live no-print is-${enVivo}`}><span className="report-live-dot" aria-hidden="true" />{enVivo === 'conectado' ? 'Actualización automática activa' : enVivo === 'error' ? 'Sin conexión para actualizaciones automáticas' : 'Conectando actualizaciones automáticas…'}</p>}
       {enVivo === 'error' && <div className="alert alert-warning no-print" role="alert">No se pudo verificar si hay datos nuevos. Los datos mostrados se conservan y se reintentará automáticamente.</div>}
       {avisoActualizado && <div className="report-live-toast no-print" role="status"><i className="bi bi-arrow-repeat me-2" aria-hidden="true" />Los datos han sido actualizados<button type="button" className="btn-close btn-close-white ms-3" aria-label="Cerrar aviso" onClick={() => setAvisoActualizado(false)} /></div>}
       <div className="report-status" role="status">{loading ? 'Consultando la información más reciente…' : updatedAt ? `Última consulta: ${updatedAt.toLocaleString('es-CO')}` : 'Sin consulta disponible'}</div>
-      <p className="small report-applied">Filtros aplicados: {resumenFiltros}</p>
+      <p className="small report-applied">Filtros de los datos mostrados: {resumenFiltros}</p>
       {error && <div className="alert alert-danger no-print" role="alert">No pudimos consultar los indicadores. Los datos mostrados pueden no estar actualizados.<button className="btn btn-link" onClick={() => setRevision(value => value + 1)}>Reintentar</button></div>}
       {sinDatos && <div className="alert alert-warning" role="status">No hay semilleros activos para los filtros seleccionados. Prueba con otro período, unidad o campus.</div>}
 
@@ -232,8 +260,8 @@ export default function ReportsPage({ alcance, token, correo, onBack, onLogout }
       </>}
 
       <section className="admin-card report-table-card" aria-labelledby="report-detail"><div className="admin-section-heading"><h2 id="report-detail"><i className="bi bi-table" aria-hidden="true" />Rendimiento por semillero</h2><span className="admin-badge">Activos e inactivos</span></div>
-        {tablaError ? <div className="alert alert-warning" role="alert">No se pudo cargar la tabla de rendimiento.<button className="btn btn-link" onClick={() => setRevision(value => value + 1)}>Reintentar</button></div>
-          : !tabla ? <p role="status">Cargando tabla…</p>
+        {tablaError && <div className="alert alert-warning" role="alert">No se pudo actualizar la tabla de rendimiento. Se conserva la última consulta disponible.</div>}
+        {!tabla ? <p role="status">Cargando tabla…</p>
             : !tabla.contenido.length ? <p>No se encontraron semilleros para los filtros aplicados.</p>
               : <RendimientoTable page={tabla} orden={orden} onOrden={next => { setOrden(next); setPagina(0); }} onPagina={setPagina} onAbrir={setDetalleId} />}
         <p className="text-muted small mt-3 mb-0">Actividades y asistencia registradas por los coordinadores en el período. % asistencia = presentes / (presentes + ausentes); las ausencias excusadas se descuentan.</p>

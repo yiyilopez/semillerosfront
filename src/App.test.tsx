@@ -15,8 +15,8 @@ vi.mock('./pages/CoordinadorHomePage', () => ({
     <div><h1>Panel coordinador</h1><button onClick={onLogout}>Cerrar sesión</button><button onClick={onReports}>Ver estadísticas</button><button onClick={() => onOpenAsistencia(10, 'Semillero IA')}>Asistencia</button></div>,
 }));
 vi.mock('./pages/AsistenciaPage', () => ({
-  default: ({ idSemillero, nombreSemillero, onBack }: { idSemillero: number; nombreSemillero: string; onBack: () => void }) =>
-    <div><h1>Asistencia {idSemillero} {nombreSemillero}</h1><button onClick={onBack}>Volver</button></div>,
+  default: ({ onReports, idSemillero, nombreSemillero, onBack }: { onReports: () => void; idSemillero: number; nombreSemillero: string; onBack: () => void }) =>
+    <div><button onClick={onReports}>Reportes</button><h1>Asistencia {idSemillero} {nombreSemillero}</h1><button onClick={onBack}>Volver</button></div>,
 }));
 vi.mock('./pages/HomePage', () => ({ default: () => <h1>Portal</h1> }));
 vi.mock('./pages/CaracterizacionPage', () => ({ default: () => <h1>Caracterización</h1> }));
@@ -131,4 +131,50 @@ it('avisa antes del vencimiento, permite continuar y luego cierra por inactivida
   act(() => vi.advanceTimersByTime(30 * 60 * 1000));
   expect(screen.getByText('Portal')).toBeInTheDocument();
   expect(screen.getByText('Sesión cerrada por inactividad.')).toBeInTheDocument();
+});
+
+it('el semillerista tiene navegación propia sin usar el alcance de coordinador', () => {
+  iniciarSesion('SEMILLERISTA');
+  render(<App />);
+  expect(screen.getByRole('heading', { name: 'Panel del semillerista' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Reportes' }));
+  expect(screen.getByRole('heading', { name: 'Estadísticas generales' })).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('aún no están disponibles');
+  expect(screen.queryByText('Reportes COORDINADOR')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /Volver al panel/ }));
+  expect(screen.getByRole('heading', { name: 'Panel del semillerista' })).toBeInTheDocument();
+});
+it('rechaza un rol desconocido al restaurar una sesión en la URL protegida', () => {
+  iniciarSesion('OTRO');
+  window.history.replaceState(null, '', '/?vista=reportes');
+  render(<App />);
+  expect(screen.getByRole('button', { name: 'Ingresar' })).toBeInTheDocument();
+  expect(sessionStorage.getItem('sigsi_auth')).toBeNull();
+});
+it('no restaura un JWT vencido aunque haya actividad reciente', () => {
+  iniciarSesion('ADMIN');
+  const auth = JSON.parse(sessionStorage.getItem('sigsi_auth')!);
+  auth.token = `h.${btoa(JSON.stringify({ rol: 'ADMIN', exp: Math.floor(Date.now() / 1000) - 1 }))}.s`;
+  sessionStorage.setItem('sigsi_auth', JSON.stringify(auth));
+  window.history.replaceState(null, '', '/?vista=reportes');
+  render(<App />);
+  expect(screen.queryByText('Reportes ADMIN')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Ingresar' })).toBeInTheDocument();
+});
+it('abre reportes desde asistencia y vuelve al panel de coordinador', () => {
+  iniciarSesion('COORDINADOR');
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: 'Asistencia' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Reportes' }));
+  expect(screen.getByRole('heading', { name: 'Reportes COORDINADOR' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Volver' }));
+  expect(screen.getByRole('heading', { name: 'Panel coordinador' })).toBeInTheDocument();
+});
+it('conserva los filtros al volver al panel y entrar de nuevo', () => {
+  iniciarSesion('ADMIN');
+  sessionStorage.setItem('sigsi_report_filters', JSON.stringify({ periodo: '2025' }));
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: 'Reportes' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Volver' }));
+  expect(JSON.parse(sessionStorage.getItem('sigsi_report_filters')!).periodo).toBe('2025');
 });

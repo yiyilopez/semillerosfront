@@ -98,3 +98,18 @@ it('elimina una actividad tras confirmar', async () => {
   expect(await screen.findByText('Actividad eliminada.')).toBeInTheDocument();
   expect(confirmar).toHaveBeenCalledTimes(2);
 });
+
+it('abre reportes y pide confirmación si hay una actividad en edición', async () => {
+  const onReports = vi.fn();
+  const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  render(<AsistenciaPage {...props} onReports={onReports} />);
+  await screen.findByText('Taller de escritura');
+  fireEvent.click(screen.getByRole('button', { name: 'Reportes' }));
+  expect(onReports).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole('button', { name: /Registrar actividad/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Reportes' }));
+  expect(onReports).toHaveBeenCalledTimes(1);
+  confirmar.mockReturnValue(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Reportes' }));
+  expect(onReports).toHaveBeenCalledTimes(2);
+});

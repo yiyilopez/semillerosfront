@@ -102,9 +102,9 @@ export function getSemillerosReporte(alcance: AlcanceReporte, filters: ReportFil
 
 // HU10: el backend genera el archivo con los filtros aplicados (RN35) y lo nombra con fecha y hora (RN36).
 export async function exportarReporte(formato: FormatoExportacion, filters: ReportFilters, orden: OrdenTabla,
-  token: string): Promise<{ nombre: string; archivo: Blob }> {
+  token: string, signal?: AbortSignal): Promise<{ nombre: string; archivo: Blob }> {
   const query = filtrosAQuery(filters, { formato, orden: orden.orden, direccion: orden.direccion });
-  const res = await fetch(`${BASE_URL}${RUTAS.ADMIN}/exportar?${query}`, opciones(token));
+  const res = await fetch(`${BASE_URL}${RUTAS.ADMIN}/exportar?${query}`, opciones(token, signal));
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.mensaje ?? `Error ${res.status}`);
@@ -122,20 +122,20 @@ export function descargarArchivo(nombre: string, archivo: Blob) {
   document.body.appendChild(enlace);
   enlace.click();
   enlace.remove();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export interface EventoReporte { evento: string; datos: string }
 
 // Separa un flujo text/event-stream en eventos. Devuelve el texto sobrante incompleto.
 export function parsearEventos(buffer: string): { eventos: EventoReporte[]; resto: string } {
-  const bloques = buffer.replace(/\r\n/g, '\n').split('\n\n');
+  const bloques = buffer.split(/\r?\n\r?\n/);
   const resto = bloques.pop() ?? '';
   const eventos: EventoReporte[] = [];
   for (const bloque of bloques) {
     let evento = 'message';
     const datos: string[] = [];
-    for (const linea of bloque.split('\n')) {
+    for (const linea of bloque.split(/\r?\n/)) {
       if (linea.startsWith('event:')) evento = linea.slice(6).trim();
       else if (linea.startsWith('data:')) datos.push(linea.slice(5).trim());
     }
@@ -147,7 +147,7 @@ export function parsearEventos(buffer: string): { eventos: EventoReporte[]; rest
 // HU13: Server-Sent Events con fetch, porque EventSource no permite enviar el token JWT.
 // Se resuelve cuando el servidor cierra la conexión y rechaza si falla.
 export async function escucharEventosReportes(token: string, onEvento: (evento: EventoReporte) => void,
-  signal: AbortSignal): Promise<void> {
+  signal: AbortSignal, onActividad?: () => void): Promise<void> {
   const res = await fetch(`${BASE_URL}${RUTAS.ADMIN}/eventos`, {
     headers: { ...authHeaders(token), Accept: 'text/event-stream' }, cache: 'no-store', signal,
   });
@@ -157,6 +157,7 @@ export async function escucharEventosReportes(token: string, onEvento: (evento: 
   for (;;) {
     const { value, done } = await lector.read();
     if (done) return;
+    onActividad?.();
     const { eventos, resto } = parsearEventos(buffer + value);
     buffer = resto;
     eventos.forEach(onEvento);
